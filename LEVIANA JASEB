@@ -1,0 +1,55 @@
+
+import makeWASocket, {
+  useMultiFileAuthState,
+  DisconnectReason
+} from "@whiskeysockets/baileys";
+import pino from "pino";
+
+async function mulaiBot() {
+  const { state, saveCreds } =
+    await useMultiFileAuthState("session");
+
+  const sock = makeWASocket({
+    auth: state,
+    logger: pino({ level: "silent" })
+  });
+
+  sock.ev.on("creds.update", saveCreds);
+
+  sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
+    if (qr) {
+      console.log("QR tersedia. Buka terminal untuk melihatnya.");
+    }
+
+    if (connection === "open") {
+      console.log("GLORY JASEB TERHUBUNG!");
+    }
+
+    if (connection === "close") {
+      const code = lastDisconnect?.error?.output?.statusCode;
+      if (code !== DisconnectReason.loggedOut) {
+        mulaiBot();
+      } else {
+        console.log("Sesi keluar. Hubungkan ulang.");
+      }
+    }
+  });
+
+  sock.ev.on("messages.upsert", async ({ messages }) => {
+    const msg = messages[0];
+    if (!msg.message || msg.key.fromMe) return;
+
+    const teks =
+      msg.message.conversation ||
+      msg.message.extendedTextMessage?.text ||
+      "";
+
+    if (teks.toLowerCase() === ".menu") {
+      await sock.sendMessage(msg.key.remoteJid, {
+        text: "🌟 GLORY JASEB\nBot aktif!\n\nPerintah: .menu"
+      });
+    }
+  });
+}
+
+mulaiBot().catch(console.error);
